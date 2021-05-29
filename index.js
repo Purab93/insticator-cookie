@@ -1,9 +1,9 @@
-import InsticatorSession from './main.js'
+import InsticatorSession from "./main.js";
 
-(()=>{
-    window.InsticatorSession = new InsticatorSession({
-        thresholdTime: 1,
-        customActiveEvents: []
-    });
-    window.InsticatorSession.init();
-})()
+(() => {
+  window.InsticatorSession = new InsticatorSession({
+    thresholdTime: 30,
+    customActiveEvents: [],
+  });
+  window.InsticatorSession.init();
+})();

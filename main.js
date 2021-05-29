@@ -1,100 +1,145 @@
-import { getExpiration, getCookie, setCookie, randomIdGenerator, getQueryParamValue } from './utils.js';
+import {
+  getCookie,
+  setCookie,
+  randomIdGenerator,
+  getQueryParamValue,
+} from "./utils.js";
 
 export default class InsticatorSession {
-    #DEFAULT_ACTIVE_EVENTS = ["mousemove", "mousedown", "keypress", "DOMMouseScroll", "mousewheel", "touchmove", "MSPointerMove"];
-    #MINUTES_TO_MILLISECONDS = 1000 * 60;
-    #inactiveThresholdTime;
-    #activeEvents;
-    #cookieName;
+  #DEFAULT_ACTIVE_EVENTS = [
+    "mousemove",
+    "mousedown",
+    "keypress",
+    "DOMMouseScroll",
+    "mousewheel",
+    "touchmove",
+    "MSPointerMove",
+  ];
+  #MINUTES_TO_MILLISECONDS = 1000 * 60;
+  #inactiveThresholdTime;
+  #activeEvents;
+  #cookieName;
 
-    constructor({ thresholdTime = 30, customActiveEvents = [], cookieName = 'insticator_session' }){
-        this.#inactiveThresholdTime = thresholdTime;
-        this.#activeEvents =  [...this.#DEFAULT_ACTIVE_EVENTS,...customActiveEvents];
-        this.#cookieName = cookieName;
+  constructor({
+    thresholdTime = 30,
+    customActiveEvents = [],
+    cookieName = "insticator_session",
+  }) {
+    this.#inactiveThresholdTime = thresholdTime;
+    this.#activeEvents = [
+      ...this.#DEFAULT_ACTIVE_EVENTS,
+      ...customActiveEvents,
+    ];
+    this.#cookieName = cookieName;
+  }
+
+  /**
+   * Setup Window Events for Activity of User
+   * @method setupEvents
+   */
+  #setupEvents = () => {
+    this.#activeEvents.map((eventName) => {
+      window.addEventListener(eventName, this.#goActive, false);
+    });
+  };
+
+  /**
+   * Checks wether current & new campaign are same
+   * @method #isSameCampaign
+   * @returns boolean for same campaign check
+   */
+  #isSameCampaign = (cookieData) => {
+    const newCampaign = getQueryParamValue("campaign"),
+      currentCampaign = cookieData.campaign;
+
+    if (newCampaign && newCampaign !== currentCampaign) {
+      return false;
     }
 
-    /**
-     * Setup Window Events for Activity of User
-     * @method setupEvents
-     */
-    #setupEvents = () => {
-        this.#activeEvents.map((eventName) => {
-            window.addEventListener(eventName, this.#goActive, false);
-        });
+    return true;
+  };
+
+  /**
+   * Returns expiry time
+   * @method #getExpiration
+   * @param {number} timeThreshold
+   * @returns {string}
+   */
+  #getExpiration = (timeThreshold) => {
+    let currentDate = new Date(),
+      newDate = new Date();
+
+    newDate.setTime(newDate.getTime() + timeThreshold);
+
+    if (currentDate.getDay() !== newDate.getDay()) {
+      currentDate.setHours(23, 59, 59, 999);
+      return currentDate.toUTCString();
     }
 
-    /**
-     * Checks wether current & new campaign are same
-     * @method #isSameCampaign
-     * @returns boolean for same campaign check
-     */
-    #isSameCampaign = async () => {
-        const newCampaign = getQueryParamValue(window.location.href, 'campaign'),
-            cookieData = await this.#getCookieData(),
-            currentCampaign = cookieData.campaign;
+    return newDate.toUTCString();
+  };
 
-        if (newCampaign && newCampaign !== currentCampaign) {
-            return false;
-        }
+  #getCookieData = async () => {
+    let cookieData = await cookieStore.get(this.#cookieName);
+    return cookieData?.value ? JSON.parse(cookieData.value) : {};
+  };
 
-        return true;
-    }
+  /**
+   * Get cookie's configuration
+   * @method #getCookieConfig
+   * @returns cookie configuration
+   */
+  #getCookieConfig = async () => {
+    let cookieData = await this.#getCookieData(),
+      currentId = cookieData.id,
+      timeThreshold = this.#inactiveThresholdTime,
+      expiration,
+      value;
 
-    /**
-     * @method getSession
-     * @returns current cookie config
-     */
-    getSession = () => {
-        let cookieData = getCookie(this.#cookieName);
-        return cookieData? JSON.parse(cookieData) : {};
-    }
+    timeThreshold *= this.#MINUTES_TO_MILLISECONDS;
 
-    #getCookieData = async () => {
-        let cookieData = await cookieStore.get(this.#cookieName);
-        return cookieData?.value ? JSON.parse(cookieData.value): {};
-    }
+    expiration = this.#getExpiration(timeThreshold);
 
-    /**
-     * Get cookie's configuration
-     * @method #getCookieConfig
-     * @returns cookie configuration
-     */
-    #getCookieConfig = async () => {
-        let cookieData = await this.#getCookieData(),
-            currentId = cookieData.id,
-            timeThreshold = this.#inactiveThresholdTime , expiration, value;
+    value = JSON.stringify({
+      id:
+        currentId && this.#isSameCampaign(cookieData)
+          ? currentId
+          : randomIdGenerator(),
+      expiration: expiration,
+      referrer: document.referrer,
+      campaign: getQueryParamValue("campaign"),
+    });
 
-        timeThreshold *= this.#MINUTES_TO_MILLISECONDS;
+    return {
+      expiration,
+      value,
+      timeThreshold,
+    };
+  };
 
-        expiration = getExpiration(timeThreshold);
+  /**
+   * @method #goActive
+   */
+  #goActive = async () => {
+    let cookieConfig = await this.#getCookieConfig();
+    setCookie(this.#cookieName, cookieConfig.value, cookieConfig.expiration);
+  };
 
-        value = JSON.stringify({
-            id: currentId && this.#isSameCampaign() ? currentId : randomIdGenerator(),
-            expiration: expiration,
-            referrer: document.referrer,
-            campaign: getQueryParamValue('campaign')
-        });
-            
-        return {
-            expiration,
-            value,
-            timeThreshold
-        };
-    }
+  /**
+   * @method getSession
+   * @returns current cookie config
+   */
+  getSession = () => {
+    let cookieData = getCookie(this.#cookieName);
+    return cookieData ? JSON.parse(cookieData) : {};
+  };
 
-    /**
-     * @method #goActive
-     */
-    #goActive = async () => {
-        let cookieConfig = await this.#getCookieConfig();
-        setCookie(this.#cookieName, cookieConfig.value, cookieConfig.expiration);
-    }
-    /**
-     * Initialise the cookie
-     * @method init
-     */
-    init = () => {
-        this.#setupEvents();
-        this.#goActive();
-    }
+  /**
+   * Initialise the cookie
+   * @method init
+   */
+  init = () => {
+    this.#setupEvents();
+    this.#goActive();
+  };
 }
