@@ -32,5 +32,9 @@
 - Validated the values using InsticatorSession.getSession() method in console window for all the scenarios.
 - Used 2 pages i.e index.html & secondPage.html, to check the referrer URL.
 - Traversed between page and validated the consistency of the cookie.
-- Printed the data in a div on the HTML pages for testing across both 1st & 2nd page.
+- Printed the data in a div on the HTML pages for testing across both pages.
 
+### Improvements
+- Add secure flag to the Cookies for transmission only over HTTPS.
+- Instead of binding individual events to monitor user activity, Navigation api can be used direclty, to detect online/offline status of the user.
+- Encode the content of the cookies.
