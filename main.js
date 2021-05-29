@@ -1,6 +1,6 @@
 import { getExpiration, getCookie, setCookie, randomIdGenerator, getQueryParamValue } from './utils.js';
 
-class InsticatorSession {
+export default class InsticatorSession {
     #DEFAULT_ACTIVE_EVENTS = ["mousemove", "mousedown", "keypress", "DOMMouseScroll", "mousewheel", "touchmove", "MSPointerMove"];
     #MINUTES_TO_MILLISECONDS = 1000 * 60;
     #inactiveThresholdTime;
@@ -98,11 +98,3 @@ class InsticatorSession {
         this.#goActive();
     }
 }
-
-(()=>{
-    window.InsticatorSession = new InsticatorSession({
-        thresholdTime: 1,
-        customActiveEvents: []
-    });
-    window.InsticatorSession.init();
-})()
